@@ -9,3 +9,40 @@
 │   ├── 32UNA_20180701T102021_50_153739_10_032860_mask_medium.tif
 │   ├── 32UNA_20180701T102021_50_153739_10_032860_meta.json
 │   └── 32UNA_20180701T102021_50_153739_10_032860_snow.tif
+
+
+
+ID	Class
+1	Continuous urban fabric
+2	Discontinuous urban fabric
+3	Industrial or commercial units
+4	Road and rail networks and associated land
+5	Port areas
+6	Airports
+7	Mineral extraction sites
+8	Dump sites
+9	Construction sites
+10	Green urban areas
+11	Sport and leisure facilities
+12	Non-irrigated arable land
+13	Vineyards
+14	Fruit trees and berry plantations
+15	Pastures
+16	Broad-leaved forest
+17	Coniferous forest
+18	Mixed forest
+19	Natural grasslands
+20	Moors and heathland
+21	Transitional woodland/shrub
+22	Beaches, dunes, sands
+23	Bare rock
+24	Sparsely vegetated areas
+25	Inland marshes
+26	Peat bogs
+27	Salt marshes
+28	Intertidal flats - Terreno
+29	Water courses - Water
+30	Water bodies - Water
+31	Coastal lagoons - Water
+32	Estuaries
+33	Sea and ocean - Water
