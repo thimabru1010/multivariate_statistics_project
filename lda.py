@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 from sklearn.mixture import GaussianMixture
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from osgeo import gdal
 import sys
 import signal
@@ -34,9 +35,6 @@ if __name__ == '__main__':
     # data = data.reshape(data.shape[0], -1)
     # labels = labels.reshape(labels.shape[0], -1)
     print(data.shape, labels.shape)
-
-    # data = extract_patches(data, 10, 0).squeeze(axis=1)
-    # labels = extract_patches(labels, 10, 0).squeeze(axis=1)
     
     filtered_data, filtered_labels = filter_class(data, labels, 12)
     filtered_data, filtered_labels = filter_class(filtered_data, filtered_labels, 15)
@@ -50,6 +48,9 @@ if __name__ == '__main__':
     print(data.shape)
     print(labels.shape)
     
+    data = extract_patches(data, 10, 0).squeeze(axis=1)
+    labels = extract_patches(labels, 10, 0).squeeze(axis=1)
+    
     # pca = PCA(n_components=0.95)
     # data = pca.fit_transform(data.reshape(data.shape[0], -1))
     
@@ -58,8 +59,8 @@ if __name__ == '__main__':
     # # print(cumulative_variance, explained_variance_ratio)
     # print(f"Explained variance: {cumulative_variance[-1]}")
     
-    # labels = np.array(mode(labels.reshape(labels.shape[0], -1), axis=1).mode)
-    # print(labels[0])
+    labels = np.array(mode(labels.reshape(labels.shape[0], -1), axis=1).mode)
+    print(labels[0])
     
     # print(f"Reduced shape: {data.shape}")
     # print(f"Reduced labels shape: {labels.shape}")
@@ -92,12 +93,9 @@ if __name__ == '__main__':
     plt.tight_layout()
     # plt.show()
     # 1/0
-    
-    # smote = SMOTE(random_state=42)
-    # data, labels = smote.fit_resample(data, labels)
 
     data = data.reshape(data.shape[0], -1)
-    labels = labels.reshape(labels.shape[0], -1)
+    labels = labels.reshape(-1)
     print(data.shape, labels.shape)
     unique_classes, counts = np.unique(labels, return_counts=True)
     print(dict(zip(unique_classes, counts)))
@@ -108,54 +106,22 @@ if __name__ == '__main__':
     # Apply PCA to reduce the number of images (samples)
     train_data, test_data, train_labels, test_labels = train_test_split(data, labels, test_size=0.5)
     
-    classes, counts = np.unique(train_labels, return_counts=True)
-    class2count = dict(zip(classes, counts))
-    total_labels = np.sum(counts)
-    print(total_labels)
-    class_weights = np.array([total_labels / class2count[label] for label in classes])
-    print(np.sum(class_weights))
-    class_weights /= class_weights.sum()
-    class2weights = dict(zip(classes, class_weights))
-    print(class2weights)
+    # classes, counts = np.unique(train_labels, return_counts=True)
+    # class2count = dict(zip(classes, counts))
+    # total_labels = np.sum(counts)
+    # print(total_labels)
+    # class_weights = np.array([total_labels / class2count[label] for label in classes])
+    # print(np.sum(class_weights))
+    # class_weights /= class_weights.sum()
+    # class2weights = dict(zip(classes, class_weights))
+    # print(class2weights)
     
-    # models = {}
-    # for cls in classes:
-    # Inicializar o GMM com os parâmetros conhecidos
-    gmm = GaussianMixture(n_components=len(classes), covariance_type='full', max_iter=50,\
-        verbose=2, verbose_interval=5)
+    lda = LDA(n_components=3)
+    lda.fit(train_data, train_labels)
+    print(lda.score(test_data, test_labels))
+    test_preds = lda.predict(test_data)
     
-    gmm._mean = np.mean(train_data, axis=0)
-    gmm._covariances = np.var(train_data, axis=0)
-    gmm._weights = class_weights
-    # models[cls] = gmm
+    print(test_preds.shape)
+    accuracy = np.sum(test_preds == test_labels) / test_labels.shape[0]
     
-    # cls_data = train_data[train_labels == cls]
-    # train_cls_data = np.mean(cls_data, axis=3, dtype=np.uint8)
-
-    # Ajustar o modelo com refinamento EM
-    gmm.fit(train_data)
-    
-    # Fazer previsões para classificar todos os pixels
-    train_preds = gmm.predict(train_data)
-    print(f"Predictions shape: {train_preds.shape}")
-
-    train_accuracy = np.mean(train_preds == train_labels)
-    print(f'Train Accuracy: {train_accuracy}')
-    
-    # Fazer previsões para classificar todos os pixels
-    test_preds = gmm.predict(test_data)
-    print(f"Predictions shape: {test_preds.shape}")
-    
-    preds_tmp = test_preds.copy()
-    clusters = np.unique(test_preds)
-    for cluster in clusters:
-        cluster_preds = preds_tmp[preds_tmp == cluster]
-        most_common_label = mode(cluster_preds).mode
-        test_preds[preds_tmp == cluster] = most_common_label
-        print(f'Cluster: {cluster} - Most common label: {most_common_label}')
-        
-    accuracy = np.mean(test_preds == test_labels)
-    print(f'Test Accuracy: {accuracy}')
-    
-    results = pd.DataFrame({'Predictions': test_preds, 'Labels': test_labels})
-    results.to_csv('data/results.csv', index=False)
+    print(f"Accuracy: {accuracy}")
