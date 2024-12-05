@@ -17,6 +17,17 @@ def extract_patches(image: np.ndarray, patch_size: int, overlap: float) -> np.nd
         window_shape_array = (1, patch_size, patch_size)
         print(image.shape)
         return np.array(view_as_windows(image, window_shape_array, step=(1, stride, stride))).reshape((-1,) + window_shape_array)
+
+def extract_patches_pots(image: np.ndarray, patch_size: int, overlap: float) -> np.ndarray:
+    stride = int((1-overlap)*patch_size)
+    if len(image.shape) == 3:
+        window_shape_array = (patch_size, patch_size, image.shape[2])
+        print(image.shape)
+        return np.array(view_as_windows(image, window_shape_array, step=(stride, stride, image.shape[2]))).reshape((-1,) + window_shape_array)
+    elif len(image.shape) == 2:
+        window_shape_array = (patch_size, patch_size)
+        print(image.shape)
+        return np.array(view_as_windows(image, window_shape_array, step=(stride, stride))).reshape((-1,) + window_shape_array)
     
 # def reset_signal_handlers():
 #     signal.signal(signal.SIGFPE, signal.SIG_DFL)  # Reset floating-point exceptions
@@ -42,7 +53,7 @@ def load_train_data(train_paths):
         label_data.append(label)
     return np.stack(train_data, axis=0), np.stack(label_data, axis=0)
 
-def filter_class(data, labels, target_class, percentage_limit=0.7):
+def filter_class(data, labels, target_class, percentage_limit=0.5):
     # Inicialize listas para armazenar os patches que não excedem o limite de porcentagem
     filtered_data = []
     filtered_labels = []
@@ -98,3 +109,20 @@ def histogram2pixels(data):
 def normalize_to_255(image):
     normalized = (image - np.min(image)) / (np.max(image) - np.min(image))
     return (normalized * 255).astype(np.uint8)
+
+def RGB2Categories(img_ref_rgb, label_dict):
+    # Convert Reference Image in RGB to a single channel integer category
+    w = img_ref_rgb.shape[0]
+    h = img_ref_rgb.shape[1]
+    # c = img_train_ref.shape[2]
+    cat_img_train_ref = np.full((w, h), -1, dtype=np.uint8)
+    for i in range(w):
+        for j in range(h):
+            r = img_ref_rgb[i][j][0]
+            g = img_ref_rgb[i][j][1]
+            b = img_ref_rgb[i][j][2]
+            rgb = (r, g, b)
+            rgb_key = str(rgb)
+            cat_img_train_ref[i][j] = label_dict[rgb_key]
+
+    return cat_img_train_ref
