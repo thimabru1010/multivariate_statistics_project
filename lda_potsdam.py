@@ -21,6 +21,7 @@ import argparse
 import matplotlib.patches as mpatches
 from sklearn.metrics import f1_score
 import cv2
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 if __name__ == '__main__':
     labels_path = 'data/Potsdam/5_Labels_all'
@@ -62,6 +63,9 @@ if __name__ == '__main__':
     plt.close()
 
     block_size = 10
+    # if pca_flag:
+    #     block_size = 10
+    
     train_data, train_labels, train_idx_patches = prepare_training_and_testing_data(train_filenames_label, map_rgb2cat, labels_path, block_size=block_size)
     test_data, test_labels, test_idx_patches = prepare_training_and_testing_data(test_filenames_label, map_rgb2cat, labels_path, train=False, block_size=block_size)
     
@@ -70,16 +74,12 @@ if __name__ == '__main__':
     print(train_data.shape, train_labels.shape)
     print(test_data.shape, test_labels.shape)
     
-    
     label_names = ['Impervious surfaces', 'Building', 'Low vegetation', 'Tree', 'Car', 'background']
-    # label_names = ['Impervious surfaces', 'Building', 'Low vegetation', 'Tree', 'Car']
     plot_classes_histogram(train_labels, label_names, show=False)
-    
+    # 1/0
     if pca_flag:
         print('Processing PCA...')
-        # data = np.concatenate(train_data, axis=0)
-        data = train_data
-        print(data.shape)
+        data = np.concatenate([train_data, test_data], axis=0)
         pca = PCA(n_components=0.95)
         pca.fit(data.reshape(data.shape[0], -1))
         
@@ -98,13 +98,12 @@ if __name__ == '__main__':
     else:
         train_data = train_data.reshape(train_data.shape[0], -1)
         test_data = test_data.reshape(test_data.shape[0], -1)
-        # train_idx_patches = train_idx_patches.reshape(train_idx_patches.shape[0], -1)
-        # test_idx_patches = test_idx_patches.reshape(test_idx_patches.shape[0], -1)
         
         train_labels = np.array(mode(train_labels.reshape(train_labels.shape[0], -1), axis=1).mode)
         test_labels = np.array(mode(test_labels.reshape(test_labels.shape[0], -1), axis=1).mode)
         train_idx_patches = np.array(mode(train_idx_patches.reshape(train_idx_patches.shape[0], -1), axis=1).mode)
         test_idx_patches = np.array(mode(test_idx_patches.reshape(test_idx_patches.shape[0], -1), axis=1).mode)
+        
     
     # Remove background of training data
     train_data = train_data[train_labels != 5]
@@ -117,40 +116,21 @@ if __name__ == '__main__':
     print(train_idx_patches.shape)
     print(test_idx_patches.shape)
     
-    if pca_flag:
-        train_data = np.concatenate([train_data, np.expand_dims(train_idx_patches, axis=1)], axis=1)
-        test_data = np.concatenate([test_data, np.expand_dims(test_idx_patches, axis=1)], axis=1)
-    else:
-        train_data = np.concatenate([train_data, train_idx_patches], axis=1)
-        test_data = np.concatenate([test_data, test_idx_patches], axis=1)
+    train_data = np.concatenate([train_data, np.expand_dims(train_idx_patches, axis=1)], axis=1)#.reshape(-1, 3)
+    test_data = np.concatenate([test_data, np.expand_dims(test_idx_patches, axis=1)], axis=1)#.reshape(-1, 3)
     print(f"Reduced shape: {train_data.shape}")
     print(f"Reduced labels shape: {train_labels.shape}")
     
-    
     classes, _ = np.unique(train_labels, return_counts=True)
-    kmeans = KMeans(n_clusters=len(classes), random_state=0)
+    lda = LDA()
+    lda.fit(train_data, train_labels)
+    # kmeans = KMeans(n_clusters=len(classes), random_state=0)
     
-    kmeans.fit(train_data)
+    # kmeans.fit(train_data)
     
     # Faz previsões para classificar todos os pixels
-    train_preds = kmeans.predict(train_data)
+    train_preds = lda.predict(train_data)
     print(f"Predictions shape: {train_preds.shape}")
-    
-    # Faz uma seleção dos clusters mais comuns para cada classe
-    cluster2label = {}
-    clusters = np.unique(train_preds)
-    print(clusters)
-    preds_tmp = train_preds.copy()
-    for cluster in clusters:
-        cluster_labels = train_labels[preds_tmp == cluster]
-        # Print proportion normalized of each label
-        unique_labels, counts = np.unique(cluster_labels, return_counts=True)
-        counts = counts / np.sum(counts)
-        most_common_label = mode(cluster_labels).mode
-        train_preds[preds_tmp == cluster] = most_common_label
-        cluster2label[cluster] = most_common_label
-        print(f'Cluster: {cluster} - Most common label: {most_common_label}')
-        print(dict(zip(unique_labels, counts)))
         
     # Metrics
     train_accuracy = np.mean(train_preds == train_labels)
@@ -159,16 +139,12 @@ if __name__ == '__main__':
     print(f'Train Accuracy: {train_accuracy}')
     print(f'Train F1 Score: {train_f1_score}')
     
-    print(cluster2label)
     # Fazer previsões para classificar todos os pixels
     print(f"Test Labels: {np.unique(test_labels)}")
-    test_preds = kmeans.predict(test_data)
-
-    # Apply map to test data
-    for cluster, label in cluster2label.items():
-        test_preds[test_preds == cluster] = label
+    test_preds = lda.predict(test_data)
+    print(f"Predictions shape: {test_preds.shape}")
     
-    np.save('data/kmeans_results/preds.npy', test_preds)
-    np.save('data/kmeans_results/labels.npy', test_labels)
+    np.save('data/lda_results/preds.npy', test_preds)
+    np.save('data/lda_results/labels.npy', test_labels)
     print('Predictions saved!')
     
