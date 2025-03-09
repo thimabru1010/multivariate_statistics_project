@@ -22,6 +22,7 @@ import matplotlib.patches as mpatches
 from sklearn.metrics import f1_score
 import cv2
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+import scipy.stats as stats
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Cluster Potsdam dataset')
@@ -54,8 +55,6 @@ if __name__ == '__main__':
     
     train_data, train_labels, train_idx_patches = prepare_training_and_testing_data(train_filenames_label, map_rgb2cat, labels_path, block_size=block_size)
     test_data, test_labels, test_idx_patches = prepare_training_and_testing_data(test_filenames_label, map_rgb2cat, labels_path, train=False, block_size=block_size)
-    
-    np.save('data/kmeans_results/train_data.npy', train_data)
     
     print(train_data.shape, train_labels.shape)
     print(test_data.shape, test_labels.shape)
@@ -134,11 +133,6 @@ if __name__ == '__main__':
         print(train_data.shape, train_idx_patches.shape)
         train_data = np.concatenate([train_data, train_idx_patches], axis=1)
         test_data = np.concatenate([test_data, test_idx_patches], axis=1)
-        
-    # train_data = np.concatenate([train_data, np.expand_dims(train_idx_patches, axis=1)], axis=1)#.reshape(-1, 3)
-    # test_data = np.concatenate([test_data, np.expand_dims(test_idx_patches, axis=1)], axis=1)#.reshape(-1, 3)
-    # print(f"Reduced shape: {train_data.shape}")
-    # print(f"Reduced labels shape: {train_labels.shape}")
     
     print(f"Reduced shape: {train_data.shape}")
     print(f"Reduced labels shape: {train_labels.shape}")
@@ -147,30 +141,29 @@ if __name__ == '__main__':
     print(f"Features: {features_folder}")
     
     classes, _ = np.unique(train_labels, return_counts=True)
-    lda = LDA()
-    lda.fit(train_data, train_labels)
     
-    # Faz previsões para classificar todos os pixels
-    train_preds = lda.predict(train_data)
-    print(f"Predictions shape: {train_preds.shape}")
-        
-    # Metrics
-    train_accuracy = np.mean(train_preds == train_labels)
-    train_f1_score = f1_score(train_labels, train_preds, average='weighted')
+    #! Algorithm starts here
+    # Group pixels by class
+    means = {}
+    covs = {}
+    for clss in classes:
+        class_pixels = train_data[train_labels == clss]
+        means[clss] = np.mean(class_pixels, axis=0)
+        covs[clss] = np.cov(class_pixels.T)
     
-    print(f'Train Accuracy: {train_accuracy}')
-    print(f'Train F1 Score: {train_f1_score}')
+    classes_likelihoods = []
+    print(classes)
+    for clss in classes:
+        # Calculamos a Log-Verossimilhança para cada classe
+        classes_likelihoods.append(stats.multivariate_normal.logpdf(test_data, mean=means[clss], cov=covs[clss]))
     
-    # Fazer previsões para classificar todos os pixels
-    print(f"Test Labels: {np.unique(test_labels)}")
-    test_preds = lda.predict(test_data)
-    print(f"Predictions shape: {test_preds.shape}")
+    #! A classe com maior verossimilhança é a classe predita
+    test_preds = np.argmax(classes_likelihoods, axis=0)
     
-    output_folder = f'data/lda_results/{exp_folder}/{features_folder}'
+    output_folder = f'data/log_likelihood/{exp_folder}/{features_folder}'
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
         
     np.save(os.path.join(output_folder, 'preds.npy'), test_preds)
     np.save(os.path.join(output_folder, 'labels.npy'), test_labels)
     print('Predictions saved!')
-    

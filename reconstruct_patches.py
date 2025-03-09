@@ -23,20 +23,49 @@ import matplotlib.patches as mpatches
 from sklearn.metrics import f1_score, accuracy_score
 
 if __name__ == '__main__':
-    sufix = 'Baseline_10x10_idx'
-    print(f'Experiment: {sufix}')
-    test_preds = np.load(f'data/kmeans_results/{sufix}/preds.npy')#.reshape((360000, 10, 10))
+    # Create argparse
+    parser = argparse.ArgumentParser(description='Cluster Potsdam dataset')
+    parser.add_argument('--pca', action='store_true', help='Apply PCA to data')
+    parser.add_argument('--patch_size', type=int, default=1, help='Selects the size of the patches')
+    parser.add_argument('--labels_path', type=str, default='data/Potsdam/5_Labels_all', help='Path to labels')
+    parser.add_argument('--n_clusters', type=int, default=5, help='Number of clusters')
+    parser.add_argument('--method', type=str, default='kmeans', help='Method')
+    args = parser.parse_args()
+    
+    if args.patch_size > 1:
+        exp_folder = 'Patches'
+        if args.pca:
+            features_folder = 'PCA_Pixels'
+        else:
+            features_folder = 'All_Pixels'
+    else:
+        exp_folder = 'NoPatches'
+        if args.pca:
+            features_folder = 'PCA_Channels'
+        else:
+            features_folder = 'All_Channels'
+    
+    if args.method == 'kmeans':
+        method_folder = 'kmeans_results'
+        folder_path = f'data/{method_folder}/{exp_folder}/{features_folder}/clusters={args.n_clusters}'
+        test_preds = np.load(os.path.join(folder_path, 'preds.npy'))
+    elif args.method == 'lda':
+        method_folder = 'lda_results'
+        folder_path = f'data/{method_folder}/{exp_folder}/{features_folder}'
+        test_preds = np.load(os.path.join(folder_path, 'preds.npy'))
+    elif args.method == 'log_likelihood':
+        method_folder = 'log_likelihood'
+        folder_path = f'data/{method_folder}/{exp_folder}/{features_folder}'
+        test_preds = np.load(os.path.join(folder_path, 'preds.npy'))
+    
+    # test_preds = np.load(f'data/{method_folder}/{exp_folder}/{features_folder}/preds.npy')
     img_test_label = load_tif_image('data/Potsdam/5_Labels_all/top_potsdam_5_13_label.tif').transpose(1, 2, 0)
     print(test_preds.shape)
     print(img_test_label.reshape(-1).shape)
     print(f"Classes: {np.unique(test_preds)}")
     print(f"Classes: {np.unique(img_test_label)}")
     
-    block_size = 10
-    # if sufix == 'Baseline':
-    #     block_size = 1
-    # else:
-    #     block_size = 10
+    block_size = args.patch_size
     
     # Decode preds that were reduced by PCA
     # Convert (360000,) to (360000, 10, 10)
@@ -54,7 +83,7 @@ if __name__ == '__main__':
     for i in range(6):
         img_test_preds_class = np.zeros_like(img_test_preds)
         img_test_preds_class[img_test_preds == i] = i
-        plt.imsave(f'data/kmeans_results/{sufix}/test_preds_class_{i}.png', img_test_preds_class)
+        plt.imsave(os.path.join(folder_path, f'test_preds_class_{i}.png'), img_test_preds_class)
     
     # Convert to RGB
     map_rgb2cat = {(255, 255, 255): 0, (0, 0, 255): 1, (0, 255, 255): 2, (0, 255, 0): 3, (255, 255, 0): 4, (255, 0, 0): 5}
@@ -76,10 +105,10 @@ if __name__ == '__main__':
     img_test_preds_rgb[mask] = target_color
     # img_test_preds_rgb[img_test_label == np.array(255, 0, 0)] = np.array(255, 0, 0)
     # Save image
-    plt.imsave(f'data/kmeans_results/{sufix}/test_preds.png', img_test_preds_rgb)
+    plt.imsave(os.path.join(folder_path, 'test_preds.png'), img_test_preds_rgb)
     
     # Reconstruct reduced labels
-    test_labels_patches = np.load(f'data/kmeans_results/{sufix}/labels.npy')
+    test_labels_patches = np.load(os.path.join(folder_path, 'labels.npy'))
     
     # Calculate Classification metrics
     
@@ -110,7 +139,7 @@ if __name__ == '__main__':
     
     img_test_labels_rgb = categories_to_rgb(img_test_labels, map_cat2rgb)
     img_test_labels_rgb[mask] = target_color
-    plt.imsave(f'data/kmeans_results/{sufix}/test_labels_10x10_rec.png', img_test_labels_rgb)
+    plt.imsave(os.path.join(folder_path, 'test_labels_10x10_rec.png'), img_test_labels_rgb)
     
     # img_label = load_tif_image('data/Potsdam/5_Labels_all/top_potsdam_5_13_label.tif').transpose(1, 2, 0)
     
@@ -131,7 +160,7 @@ if __name__ == '__main__':
     fig.legend(handles=patches, loc='center left', bbox_to_anchor=(1.05, 0.5), ncol=3)
     plt.tight_layout()
     plt.show()
-    fig.savefig(f'data/kmeans_results/{sufix}/predicted_reconstructed_original_labels.png', dpi=300)
+    fig.savefig(os.path.join(folder_path, 'predicted_reconstructed_original_labels.png'), dpi=300)
     plt.close()
     
     

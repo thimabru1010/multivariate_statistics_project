@@ -22,15 +22,37 @@ def extract_patches(image: np.ndarray, patch_size: int, overlap: float) -> np.nd
         return np.array(view_as_windows(image, window_shape_array, step=(1, stride, stride))).reshape((-1,) + window_shape_array)
 
 def extract_training_patches(image: np.ndarray, patch_size: int, overlap: float) -> np.ndarray:
+    """
+    Extract patches from an image with any number of dimensions.
+    
+    Args:
+        image: Input array of any shape
+        patch_size: Size of patches (same for all spatial dimensions)
+        overlap: Overlap fraction between patches (0 to 1)
+    
+    Returns:
+        Array of patches
+    """
     stride = int((1-overlap)*patch_size)
-    if len(image.shape) == 3:
-        window_shape_array = (patch_size, patch_size, image.shape[2])
-        print(image.shape)
-        return np.array(view_as_windows(image, window_shape_array, step=(stride, stride, image.shape[2]))).reshape((-1,) + window_shape_array)
-    elif len(image.shape) == 2:
-        window_shape_array = (patch_size, patch_size)
-        print(image.shape)
-        return np.array(view_as_windows(image, window_shape_array, step=(stride, stride))).reshape((-1,) + window_shape_array)
+    
+    # Create window shape - patch_size for first dimensions, full size for channels
+    window_shape = tuple([patch_size] * (len(image.shape)-1)) if len(image.shape) > 2 else (patch_size, patch_size)
+    if len(image.shape) > 2:
+        window_shape += (image.shape[-1],)
+    
+    # Create step size - stride for spatial dims, full size for channels
+    step = tuple([stride] * (len(image.shape)-1)) if len(image.shape) > 2 else (stride, stride)
+    if len(image.shape) > 2:
+        step += (image.shape[-1],)
+    
+    print(f"Image shape: {image.shape}")
+    print(window_shape)
+    patches = view_as_windows(image, window_shape, step=step)
+    
+    # Reshape to (-1, *window_shape)
+    output_shape = (-1,) + window_shape
+    return np.array(patches).reshape(output_shape)
+
 def extract_testing_patches(image, patch_size):
     """
     Extracts and sorts patches from a large remote sensing image.
@@ -253,6 +275,7 @@ def reconstruct_reduced_patches(data, index_matrix, block_size):
     return reconstructed_data
 
 def reconstruct_patches(patches, original_shape):
+    print(patches.shape)
     patch_size = patches.shape[1]
     img = np.zeros(original_shape)
     idx = 0
@@ -305,8 +328,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
                 irrg_patches = extract_training_patches(irrg, block_size, overlap)
                 dsm_height_patches = np.expand_dims(extract_training_patches(dsm_height, block_size, overlap), axis=-1)
                 index_matrix_patches = extract_training_patches(index_matrix, block_size, overlap)
-                # mag_fourier_patches = np.expand_dims(extract_training_patches(mag_fourier, block_size, 0), axis=-1)
-                # phase_fourier_patches = np.expand_dims(extract_training_patches(phase_fourier, block_size, 0), axis=-1)
                 canny_patches = np.expand_dims(extract_training_patches(canny, block_size, overlap), axis=-1)
                 ndvi_patches = np.expand_dims(extract_training_patches(ndvi, block_size, overlap), axis=-1)
                 print("Train")
@@ -314,8 +335,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
                 print(irrg_patches.shape)
                 print(dsm_height_patches.shape)
                 print(index_matrix_patches.shape)
-                # print(mag_fourier_patches.shape)
-                # print(phase_fourier_patches.shape)
                 print(canny_patches.shape)
                 print(ndvi_patches.shape)
             else:
@@ -323,8 +342,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
                 irrg_patches = extract_testing_patches(irrg, block_size)
                 dsm_height_patches = np.expand_dims(extract_testing_patches(dsm_height, block_size), axis=-1)
                 index_matrix_patches = extract_testing_patches(index_matrix, block_size)
-                # mag_fourier_patches = np.expand_dims(extract_testing_patches(mag_fourier, block_size), axis=-1)
-                # phase_fourier_patches = np.expand_dims(extract_testing_patches(phase_fourier, block_size), axis=-1)
                 canny_patches = np.expand_dims(extract_testing_patches(canny, block_size), axis=-1)
                 ndvi_patches = np.expand_dims(extract_testing_patches(ndvi, block_size), axis=-1)
                 print("Test")
@@ -332,8 +349,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
                 print(irrg_patches.shape)
                 print(dsm_height_patches.shape)
                 print(index_matrix_patches.shape)
-                # print(mag_fourier_patches.shape)
-                # print(phase_fourier_patches.shape)
                 print(canny_patches.shape)
                 print(ndvi_patches.shape)
         else:
@@ -341,8 +356,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
             irrg = irrg.reshape(-1, irrg.shape[-1])
             dsm_height = np.expand_dims(dsm_height.reshape(-1), axis=-1)
             index_matrix = index_matrix.reshape(-1)
-            # mag_fourier = np.expand_dims(mag_fourier.reshape(-1), axis=-1)
-            # phase_fourier = np.expand_dims(phase_fourier.reshape(-1), axis=-1)
             canny = np.expand_dims(canny.reshape(-1), axis=-1)
             ndvi = np.expand_dims(ndvi.reshape(-1), axis=-1)
             return np.concatenate([irrg, dsm_height, ndvi, canny], axis=-1), label, index_matrix

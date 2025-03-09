@@ -60,9 +60,6 @@ if __name__ == '__main__':
     map_rgb2cat = {(255, 255, 255): 0, (0, 0, 255): 1, (0, 255, 255): 2, (0, 255, 0): 3, (255, 255, 0): 4, (255, 0, 0): 5}
     print(img_test_label.shape)
     # img_test_label = rgb_to_categories(img_test_label, map_rgb2cat)
-    
-    # Assign background class to preds
-    # img_test_preds[img_test_label == 5] = 5
 
     # Create reverse dictionary
     map_cat2rgb = {v: k for k, v in map_rgb2cat.items()}

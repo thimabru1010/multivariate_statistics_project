@@ -1,11 +1,24 @@
 \documentclass{article}
 \usepackage{amsmath}
+\usepackage{multicol}
 
 \begin{document}
+
+\begin{multicols}{2}
+
+\[
+\text{Precision}_i = \frac{\text{TP}_i}{\text{TP}_i + \text{FP}_i}
+\]
+
+\[
+\text{Recall}_i = \frac{\text{TP}_i}{\text{TP}_i + \text{FN}_i}
+\]
 
 \[
 \text{F1} = \frac{1}{C} \sum_{i=1}^C \frac{2 \cdot \text{Precision}_i \cdot \text{Recall}_i}{\text{Precision}_i + \text{Recall}_i}
 \]
+
+\columnbreak
 
 \[
 \text{mIoU} = \frac{1}{C} \sum_{i=1}^C \frac{|A_i \cap B_i|}{|A_i \cup B_i|}
@@ -14,5 +27,7 @@
 \[
 \text{Accuracy} = \frac{\sum_{i=1}^C \text{TP}_i}{\text{Total de Pixels}}
 \]
+
+\end{multicols}
 
 \end{document}
