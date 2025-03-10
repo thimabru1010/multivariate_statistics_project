@@ -360,7 +360,6 @@ def prepare_training_and_testing_data(filenames, map_rgb2cat, labels_path, train
             ndvi = np.expand_dims(ndvi.reshape(-1), axis=-1)
             return np.concatenate([irrg, dsm_height, ndvi, canny], axis=-1), label, index_matrix
             
-            
         indexes_data.append(index_matrix_patches)
         train_data.append(np.concatenate([irrg_patches, dsm_height_patches, ndvi_patches, canny_patches], axis=-1))
         train_labels.append(label_patches)

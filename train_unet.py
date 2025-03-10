@@ -64,6 +64,7 @@ class SegmentationDataset(Dataset):
         # Clone to avoid modifying originals
         img = image.clone()
         msk = mask.clone()
+        msk = msk.unsqueeze(0)  # Add channel dimension to mask
         
         # 1. Random horizontal flip (50% probability)
         if random.random() > 0.5:
@@ -86,12 +87,28 @@ class SegmentationDataset(Dataset):
         # 4. Random brightness adjustment (40% probability)
         if random.random() > 0.6:
             brightness_factor = random.uniform(0.8, 1.2)  # ±20% brightness
-            img = TF.adjust_brightness(img, brightness_factor)
+            
+            # Dividir canais
+            img_visual = img[:3]  # Primeiros 3 canais (RGB/IRRG)
+            img_extra = img[3:]   # Canais adicionais (podem ser outros tipos de dados)
+    
+            img_visual = TF.adjust_brightness(img_visual, brightness_factor)
+            
+            # Recombinar
+            img = torch.cat([img_visual, img_extra], dim=0)
             
         # 5. Random contrast adjustment (30% probability)
-        if random.random() > 7:
+        if random.random() > 0.7:
             contrast_factor = random.uniform(0.8, 1.2)  # ±20% contrast
-            img = TF.adjust_contrast(img, contrast_factor)
+            
+            # Dividir canais
+            img_visual = img[:3]  # Primeiros 3 canais (RGB/IRRG)
+            img_extra = img[3:]   # Canais adicionais
+    
+            img_visual = TF.adjust_contrast(img_visual, contrast_factor)
+            
+            # Recombinar
+            img = torch.cat([img_visual, img_extra], dim=0)
             
         # 6. Random Gaussian noise (20% probability)
         if random.random() > 0.8:
@@ -99,7 +116,7 @@ class SegmentationDataset(Dataset):
             img = img + noise
             img = torch.clamp(img, 0, 1)  # Ensure values stay in valid range
         
-        return img, msk
+        return img, msk.squeeze(0)
 
 def validate_model(model, val_loader, criterion):
     model.eval()
@@ -136,7 +153,8 @@ def validate_model(model, val_loader, criterion):
 
     return val_loss
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs, patience, save_path, device):
+def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler,\
+    num_epochs, patience, save_path, device):
     model.train()
     best_loss = float('inf')
     epochs_no_improve = 0
@@ -164,7 +182,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
 
         scheduler.step(val_loss)
         
-        print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {epoch_loss:.4f}, Validation Loss: {val_loss:.4f}")
+        # Fix the learning rate display
+        print(f"Epoch [{epoch+1}/{num_epochs}], LR: {optimizer.param_groups[0]['lr']:.6f}, Training Loss: {epoch_loss:.4f}, Validation Loss: {val_loss:.4f}")
 
         # Early Stopping
         if val_loss < best_loss:
@@ -187,18 +206,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     labels_path = 'data/Potsdam/5_Labels_all'
-        
-    pca_flag = args.pca
     
     # filenames_label = np.random.choice(filenames_label, 3)
     filenames_label = ['top_potsdam_2_14_label.tif', 'top_potsdam_6_12_label.tif', 'top_potsdam_5_13_label.tif']
     print(filenames_label)
     
     # Train test split
-    # train_filenames_label, test_filenames_label = train_test_split(filenames_label, test_size=0.2)
     train_filenames_label = ['top_potsdam_2_14_label.tif', 'top_potsdam_6_12_label.tif']
-    test_filenames_label = ['top_potsdam_5_13_label.tif']
-    print(len(train_filenames_label), len(test_filenames_label))
+    print(len(train_filenames_label))
     
     # map_rgb2cat = {'(255, 255, 255)': 0, '(255, 0, 0)': 1, '(0, 255, 255)': 2, '(0, 255, 0)': 3, '(0, 0, 255)': 4, '(255, 255, 0)': 5}
     map_rgb2cat = {(255, 255, 255): 0, (0, 0, 255): 1, (0, 255, 255): 2, (0, 255, 0): 3, (255, 255, 0): 4, (255, 0, 0): 5}
@@ -208,14 +223,12 @@ if __name__ == '__main__':
 
     #! Only reads data
     train_data, train_labels, _ = prepare_training_and_testing_data(train_filenames_label, map_rgb2cat, labels_path, block_size=1)
-    test_data, test_labels, _ = prepare_training_and_testing_data(test_filenames_label, map_rgb2cat, labels_path, train=False, block_size=1)
     
-    if pca_flag:
+    if args.pca:
         exp_folder = 'NoPatches'
         features_folder = 'PCA_Channels'
         print('Processing PCA...')
         print(train_data.shape)
-        print(test_data.shape)
         original_shape = train_data.shape
         pca = PCA(n_components=0.95)
         pca.fit(train_data.reshape(train_data.shape[0], -1))
@@ -224,18 +237,22 @@ if __name__ == '__main__':
         dump(pca, 'data/UNet/pca_model.joblib')
         
         train_data = pca.transform(train_data.reshape(train_data.shape[0], -1))
-        test_data = pca.transform(test_data.reshape(test_data.shape[0], -1))
         
         train_data = train_data.reshape(original_shape[0], original_shape[1], -1)
-        test_data = test_data.reshape(original_shape[0], original_shape[0])
         
         explained_variance_ratio = pca.explained_variance_ratio_
         cumulative_variance = explained_variance_ratio.cumsum()
         # print(cumulative_variance, explained_variance_ratio)
         print(f"Explained variance: {cumulative_variance[-1]}")
     
-    train_data, train_labels = extract_training_patches(train_data, args.patch_size, overlap=0.2)
-    train_labels = np.expand_dims(train_labels, axis=1)
+    print(train_data.shape, train_labels.shape)
+    train_data = train_data.reshape(6000, 6000, -1)
+    train_labels = train_labels.reshape(6000, 6000)
+    
+    train_data = extract_training_patches(train_data, args.patch_size, overlap=0.2)
+    train_labels = extract_training_patches(train_labels, args.patch_size, overlap=0.2)
+    
+    train_data = train_data.transpose(0, 3, 1, 2)
     print(f"Train data shape: {train_data.shape}, Train labels shape: {train_labels.shape}")
     
     classes, _ = np.unique(train_labels, return_counts=True)
@@ -244,9 +261,9 @@ if __name__ == '__main__':
 
     num_epochs = 50
     learning_rate = 1e-3
-    batch_size = 16
+    batch_size = 32
     num_classes = len(classes)  # Número de classes para classificação multiclasse
-    patience = 5  # Número de épocas para early stopping
+    patience_early_stopping = 10  # Número de épocas para early stopping
     save_path = "data/UNet"  # Caminho para salvar o melhor modelo
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -289,10 +306,21 @@ if __name__ == '__main__':
         mode='min', 
         factor=0.5,
         patience=5,
-        min_lr=1e-6, 
+        min_lr=1e-5, 
         verbose=True
     )
     
     #! Treino
-    train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs, patience, save_path, device)
+    train_model(
+        model, 
+        train_loader, 
+        val_loader,
+        criterion,
+        optimizer,
+        scheduler,
+        num_epochs,
+        patience_early_stopping,
+        save_path,
+        device
+    )
 
